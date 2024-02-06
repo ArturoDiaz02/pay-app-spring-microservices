@@ -1,0 +1,120 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      POSTGRES_DB: db_invoice
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432"
+    networks:
+      - distribuidos
+
+#  mysql:
+#    image: mysql
+#    container_name: db-mysql
+#    environment:
+#      MYSQL_DATABASE: db_operation
+#      MYSQL_ROOT_PASSWORD: mysql
+#    ports:
+#        - "3306"
+#    networks:
+#      - distribuidos
+
+#  mongodb:
+#    image: mongo
+#    container_name: db-mongo
+#    environment:
+#      MONGO_INITDB_DATABASE: db_transaction
+#      MONGO_INITDB_ROOT_USERNAME: root
+#      MONGO_INITDB_ROOT_PASSWORD: root
+#    ports:
+#      - "27017"
+#    networks:
+#      - distribuidos
+
+  servicekafka:
+    image: johnnypark/kafka-zookeeper
+    container_name: servicekafka
+    environment:
+      ADVERTISED_HOST: servicekafka
+      NUM_PARTITIONS: 3
+    ports:
+      - "9092:9092"
+      - "2181:2181"
+    networks:
+      - distribuidos
+
+  app-config:
+    build:
+      context: ./app-config
+      dockerfile: Dockerfile
+    container_name: app-config
+    platform: linux/amd64
+    ports:
+      - "8888:8888"
+    networks:
+      - distribuidos
+    depends_on:
+      - consul
+
+  app-invoice:
+    build:
+      context: ./app-invoice
+      dockerfile: Dockerfile
+    container_name: app-invoice
+    platform: linux/amd64
+    ports:
+      - "8006:8006"
+    networks:
+      - distribuidos
+    depends_on:
+      - app-config
+      - servicekafka
+      - postgres
+      - consul
+
+#  pay-service:
+#    image: alejandro945/app-pay
+#    container_name: pay-service
+#    platform: linux/amd64
+#    ports:
+#      - "8010:8010"
+#    networks:
+#      - distribuidos
+#    depends_on:
+#      - config-service
+#      - servicekafka
+#      - mysql
+#      - consul
+
+#  transaction-service:
+#    image: alejandro945/app-transaction
+#    container_name: transaction-service
+#    platform: linux/amd64
+#    ports:
+#      - "8082:8082"
+#    networks:
+#      - distribuidos
+#    depends_on:
+#      - config-service
+#      - servicekafka
+#      - mongodb
+#      - consul
+
+  consul:
+    image: consul:1.15.4
+    container_name: consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    networks:
+      - distribuidos
+    command: agent -server -bootstrap-expect 1 -ui -data-dir /tmp -client=0.0.0.0
+
+networks:
+   distribuidos:
+     driver: bridge
